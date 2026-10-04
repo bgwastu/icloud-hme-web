@@ -1,0 +1,504 @@
+import { test, expect, type Page } from "@playwright/test";
+import type { Snapshot } from "../../src/shared/types";
+async function mockApi(page: Page, connected = true) {
+  const data: Snapshot = {
+    connection: connected
+      ? {
+          id: "connection",
+          accountEmail: "owner@example.com",
+          region: "global",
+          status: "connected",
+          lastSync: "2026-10-04T01:00:00Z",
+          lastError: null,
+        }
+      : null,
+    aliases: connected
+      ? [
+          {
+            id: "1",
+            email: "quiet-inbox@icloud.com",
+            label: "Newsletter subscriptions",
+            note: "Reading without the extra noise.",
+            active: true,
+            version: "v1",
+            verifiedAt: "2026-10-04T01:00:00Z",
+            createdAt: null,
+          },
+          {
+            id: "2",
+            email: "weekend-trip@icloud.com",
+            label: "Travel bookings",
+            note: "Hotels, flights, and the occasional adventure.",
+            active: true,
+            version: "v2",
+            verifiedAt: "2026-10-04T01:00:00Z",
+            createdAt: null,
+          },
+          {
+            id: "3",
+            email: "old-store@icloud.com",
+            label: "Old shopping account",
+            note: "",
+            active: false,
+            version: "v3",
+            verifiedAt: "2026-10-04T01:00:00Z",
+            createdAt: null,
+          },
+        ]
+      : [],
+    operations: [],
+  };
+  let lastPayload: Record<string, unknown> = {},
+    writes = 0;
+  await page.route("**/api/**", async (route) => {
+    const request = route.request(),
+      path = new URL(request.url()).pathname,
+      method = request.method();
+    const body = method === "GET" ? {} : request.postDataJSON();
+    let response: unknown = data;
+    if (path === "/api/me") response = { email: "owner@example.com" };
+    else if (path === "/api/icloud/connection" && method === "PUT") {
+      data.connection = {
+        id: "connection",
+        accountEmail: "owner@example.com",
+        region: "global",
+        status: "connected",
+        lastSync: null,
+        lastError: null,
+      };
+      response = { connection: data.connection };
+    } else if (path === "/api/aliases" && method === "POST") {
+      lastPayload = body;
+      writes++;
+      data.aliases.push({
+        id: "4",
+        email: "fresh-address@icloud.com",
+        label: body.label,
+        note: body.note,
+        active: true,
+        version: "v4",
+        verifiedAt: new Date().toISOString(),
+        createdAt: null,
+      });
+      response = { operation: { status: "succeeded" }, snapshot: data };
+    } else if (path.match(/\/aliases\/\d+$/)) {
+      const alias = data.aliases.find((x) => x.id === path.split("/").at(-1))!;
+      if (method === "GET") response = { alias };
+      else if (method === "PATCH") {
+        lastPayload = body;
+        writes++;
+        if ("note" in body) alias.note = body.note;
+        if ("label" in body) alias.label = body.label;
+        alias.version = "changed";
+        response = { operation: { status: "succeeded" }, snapshot: data };
+      } else if (method === "DELETE") {
+        lastPayload = body;
+        writes++;
+        data.aliases = data.aliases.filter((x) => x.id !== alias.id);
+        response = { operation: { status: "succeeded" }, snapshot: data };
+      }
+    }
+    await route.fulfill({ json: response });
+  });
+  return { data, payload: () => lastPayload, writes: () => writes };
+}
+test("logs out through Access without disconnecting the Apple account", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  await page.route("**/cdn-cgi/access/logout", (route) =>
+    route.fulfill({ contentType: "text/html", body: "Signed out" }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("menuitem", { name: "Logout", exact: true }).click();
+  await expect(page).toHaveURL(/\/cdn-cgi\/access\/logout$/);
+  expect(mock.writes()).toBe(0);
+  expect(mock.data.connection?.status).toBe("connected");
+  expect(mock.data.aliases).toHaveLength(3);
+});
+test("connects through the first-use wizard without retaining the pasted cookie", async ({
+  page,
+}) => {
+  await mockApi(page, false);
+  await page.goto("/");
+  await expect(
+    page.getByRole("dialog", { name: "Connect iCloud" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/dialog=connect.*step=import/);
+  await page.getByLabel("iCloud cookies").fill("session=test-cookie");
+  await page
+    .getByRole("button", { name: "Connect iCloud", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(page.getByRole("status")).toContainText("iCloud connected");
+  expect(await page.content()).not.toContain("session=test-cookie");
+  expect(
+    await page.evaluate(() =>
+      JSON.stringify({ ...localStorage, ...sessionStorage }),
+    ),
+  ).not.toContain("test-cookie");
+});
+test("creates an alias and clears a note while preserving the label", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "New address" }).click();
+  await page
+    .getByRole("textbox", { name: "Label", exact: true })
+    .fill("New account");
+  await page.getByLabel("Notes (optional)").fill("Created in the browser");
+  await page
+    .getByRole("button", { name: "Create address", exact: true })
+    .click();
+  await expect(page.getByText("New account", { exact: true })).toBeVisible();
+  expect(mock.payload().operationKey).toMatch(/^[a-f\d-]{36}$/);
+  await page
+    .getByRole("link", { name: "Open Newsletter subscriptions" })
+    .click();
+  await page.getByRole("textbox", { name: "Notes", exact: true }).fill("");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  expect(mock.payload().note).toBe("");
+  expect(mock.payload()).not.toHaveProperty("label");
+});
+test("requires exact address confirmation and restores keyboard focus after cancel", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  await page.goto("/");
+  await page
+    .getByRole("link", { name: "Open Newsletter subscriptions" })
+    .click();
+  const deleteButton = page.getByRole("button", {
+    name: "Delete",
+    exact: true,
+  });
+  await deleteButton.click();
+  await expect(
+    page.getByRole("button", { name: "Delete permanently", exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("dialog", { name: "Edit address" }),
+  ).toBeVisible();
+  await expect(deleteButton).toBeFocused();
+  await deleteButton.click();
+  await page.getByLabel("Type the address to confirm").fill("wrong@icloud.com");
+  await expect(
+    page.getByRole("button", { name: "Delete permanently", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByLabel("Type the address to confirm")
+    .fill("quiet-inbox@icloud.com");
+  await page
+    .getByRole("button", { name: "Delete permanently", exact: true })
+    .click();
+  await expect(page.getByText("Address deleted")).toBeVisible();
+  expect(mock.writes()).toBe(1);
+  expect(mock.payload().confirmEmail).toBe("quiet-inbox@icloud.com");
+});
+test("filters aliases and fits desktop and mobile screens", async ({
+  page,
+}, testInfo) => {
+  await mockApi(page);
+  await page.goto("/");
+  await expect(
+    page.getByText("Newsletter subscriptions", { exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `test-results/aliases-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 320, height: 740 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await expect(
+    page.locator(".address-row").first().getByText("Active", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("radiogroup")
+    .getByText("Inactive", { exact: true })
+    .click();
+  await expect(
+    page.getByText("Old shopping account", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Travel bookings", { exact: true }),
+  ).not.toBeVisible();
+  await page.getByRole("radiogroup").getByText("All", { exact: true }).click();
+  await page.getByLabel("Search addresses").fill("hotels");
+  await expect(
+    page.getByText("Travel bookings", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Newsletter subscriptions", { exact: true }),
+  ).not.toBeVisible();
+});
+test("reuses the creation key after a lost browser response", async ({
+  page,
+}) => {
+  await mockApi(page);
+  let firstKey: string | undefined,
+    attempts = 0;
+  await page.route("**/api/aliases", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const body = route.request().postDataJSON();
+    attempts++;
+    if (attempts === 1) {
+      firstKey = body.operationKey;
+      return route.abort("failed");
+    }
+    expect(body.operationKey).toBe(firstKey);
+    return route.fallback();
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "New address" }).click();
+  await page
+    .getByRole("textbox", { name: "Label", exact: true })
+    .fill("Interrupted create");
+  await page
+    .getByRole("button", { name: "Create address", exact: true })
+    .click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+    "connection was interrupted",
+  );
+  await page
+    .getByRole("button", { name: "Create address", exact: true })
+    .click();
+  await expect(page.getByText("Address created")).toBeVisible();
+  expect(attempts).toBe(2);
+});
+test("keeps a note draft through a conflict and modal navigation, then saves against the reviewed version", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  let patches = 0;
+  await page.route("**/api/aliases/1", async (route) => {
+    if (route.request().method() !== "PATCH" || patches++ > 0)
+      return route.fallback();
+    Object.assign(mock.data.aliases[0], {
+      label: "Changed elsewhere",
+      note: "Current Apple note",
+      version: "new-version",
+    });
+    await route.fulfill({
+      status: 409,
+      json: {
+        error: {
+          code: "conflict",
+          message: "Review the current iCloud version.",
+          requestId: "test-request",
+        },
+      },
+    });
+  });
+  await page.goto("/");
+  await page
+    .getByRole("link", { name: "Open Newsletter subscriptions" })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Notes", exact: true })
+    .fill("My unsaved draft");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(
+    page.getByText("Changed in iCloud", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Notes", exact: true }),
+  ).toHaveValue("My unsaved draft");
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await page.getByRole("link", { name: "Open Changed elsewhere" }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Notes", exact: true }),
+  ).toHaveValue("My unsaved draft");
+  await page.getByRole("button", { name: "Keep my edits" }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Label", exact: true }),
+  ).toHaveValue("Changed elsewhere");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  expect(mock.payload().baseVersion).toBe("new-version");
+  expect(mock.payload().note).toBe("My unsaved draft");
+  expect(mock.payload()).not.toHaveProperty("label");
+});
+
+test("keeps search, filters and address modals in the URL through reload, Back and Forward", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto("/?q=hotels&status=active");
+  await expect(page.getByLabel("Search addresses")).toHaveValue("hotels");
+  await page.getByRole("link", { name: "Open Travel bookings" }).click();
+  await expect(page).toHaveURL(/q=hotels&status=active&address=2/);
+  await expect(
+    page.getByRole("dialog", { name: "Edit address" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("textbox", { name: "Notes", exact: true }),
+  ).toHaveValue("Hotels, flights, and the occasional adventure.");
+  await page.goBack();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(page.getByLabel("Search addresses")).toHaveValue("hotels");
+  await page.goForward();
+  await expect(
+    page.getByRole("dialog", { name: "Edit address" }),
+  ).toBeVisible();
+});
+
+test("syncs without a refresh button and opens the reconnect wizard after expiry", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  let syncs = 0;
+  await page.route("**/api/aliases/sync", async (route) => {
+    syncs++;
+    mock.data.connection!.status = "reconnect_required";
+    await route.fulfill({
+      status: 401,
+      json: {
+        error: {
+          code: "reconnect_required",
+          message: "Reconnect iCloud.",
+          requestId: "test",
+        },
+      },
+    });
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("dialog", { name: "Reconnect iCloud" }),
+  ).toBeVisible();
+  expect(syncs).toBe(1);
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: "Open Newsletter subscriptions" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "New address", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: /Refresh|Settings/ }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Reconnect", exact: true }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByLabel("iCloud cookies").fill("session=new-cookie");
+  await page
+    .getByRole("button", { name: "Connect iCloud", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "New address", exact: true }),
+  ).toBeEnabled();
+});
+
+test("opens a deletion deep link, traps keyboard focus and keeps mobile actions visible", async ({
+  page,
+}, testInfo) => {
+  await mockApi(page);
+  await page.goto("/?address=1&dialog=delete");
+  const dialog = page.getByRole("dialog", { name: "Delete address" });
+  await expect(dialog).toBeVisible();
+  await page
+    .getByLabel("Type the address to confirm")
+    .fill("quiet-inbox@icloud.com");
+  await expect(
+    page.getByRole("button", { name: "Delete permanently" }),
+  ).toBeInViewport();
+  for (let index = 0; index < 8; index++) {
+    await page.keyboard.press("Tab");
+    expect(
+      await dialog.evaluate((element) =>
+        element.contains(document.activeElement),
+      ),
+    ).toBe(true);
+  }
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `test-results/delete-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page).toHaveURL(/address=1$/);
+  await expect(
+    page.getByRole("dialog", { name: "Edit address" }),
+  ).toBeVisible();
+});
+
+test("automatic sync preserves an unsaved note and exposes an external change for review", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const mock = await mockApi(page);
+  let syncs = 0;
+  await page.route("**/api/aliases/sync", async (route) => {
+    syncs++;
+    await route.fallback();
+  });
+  await page.goto("/");
+  await expect.poll(() => syncs).toBe(1);
+  await page
+    .getByRole("link", { name: "Open Newsletter subscriptions" })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Notes", exact: true })
+    .fill("Draft kept through sync");
+  Object.assign(mock.data.aliases[0], {
+    note: "Changed in Apple settings",
+    version: "external",
+  });
+  await page.clock.fastForward(300_000);
+  await expect.poll(() => syncs).toBe(2);
+  await expect(
+    page.getByRole("textbox", { name: "Notes", exact: true }),
+  ).toHaveValue("Draft kept through sync");
+  await expect(
+    page.getByText("Changed in iCloud", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeDisabled();
+});
+
+test("does not enable notes from the cache when iCloud omits the current note", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  await page.route("**/api/aliases/1", async (route) => {
+    await route.fulfill({
+      json: { alias: { ...mock.data.aliases[0], note: null } },
+    });
+  });
+  await page.goto("/?address=1");
+  await expect(
+    page.getByText(
+      "iCloud did not return this note. Reopen the address to try again.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Notes", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("textbox", { name: "Label", exact: true })
+    .fill("Edited label");
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeDisabled();
+  expect(mock.writes()).toBe(0);
+});

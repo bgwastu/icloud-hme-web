@@ -10,7 +10,7 @@ AI Disclosure: Human Validated.
 - Deactivate, reactivate, or delete addresses.
 - Search, copy, and export addresses, with automatic sync.
 
-Cloudflare Access protects the app. The setup wizard connects one Apple account and stores its session encrypted. Apple may require you to reconnect when the session expires.
+The setup wizard connects one Apple account and stores its session encrypted. Apple may require you to reconnect when the session expires.
 
 ## Development
 

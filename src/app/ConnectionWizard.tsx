@@ -37,11 +37,7 @@ export function ConnectionWizard({
     region === "china" ? "https://www.icloud.com.cn" : "https://www.icloud.com";
   return (
     <Stack gap="lg" className="wizard">
-      <Stepper
-        active={importing ? 1 : 0}
-        size="xs"
-        allowNextStepsSelect={false}
-      >
+      <Stepper active={importing ? 1 : 0} allowNextStepsSelect={false}>
         <Stepper.Step label="Sign in" />
         <Stepper.Step label="Connect" />
       </Stepper>
@@ -59,7 +55,6 @@ export function ConnectionWizard({
           {!connection && (
             <NativeSelect
               label="iCloud website"
-              size="md"
               value={region}
               onChange={(event) =>
                 setRegion(event.currentTarget.value as Region)
@@ -123,7 +118,6 @@ export function ConnectionWizard({
             autoComplete="off"
             spellCheck={false}
             autoCapitalize="off"
-            size="md"
             rows={6}
             maxLength={65_536}
             required

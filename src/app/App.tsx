@@ -240,13 +240,9 @@ export function App() {
           </a>
           <div className="header-actions">
             <ThemeControl />
-            <Menu position="bottom-end" width={180}>
+            <Menu>
               <Menu.Target>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label="More options"
-                >
+                <ActionIcon aria-label="More options">
                   <IconDots size={22} />
                 </ActionIcon>
               </Menu.Target>
@@ -352,7 +348,6 @@ export function App() {
             aria-label="Search addresses"
             placeholder="Search addresses"
             leftSection={<IconSearch size={19} />}
-            size="md"
             value={query}
             onChange={(event) =>
               navigate({ q: event.currentTarget.value || null }, true)
@@ -360,7 +355,6 @@ export function App() {
           />
           <SegmentedControl
             aria-label="Filter addresses"
-            size="sm"
             value={filter}
             onChange={(value) =>
               navigate({ status: value === "all" ? null : value }, true)
@@ -417,17 +411,13 @@ export function App() {
                 </a>
                 <Badge
                   className="row-status"
-                  size="sm"
-                  variant="light"
                   color={alias.active ? "green" : "gray"}
-                  tt="none"
                 >
                   {alias.active ? "Active" : "Inactive"}
                 </Badge>
                 <CopyButton value={alias.email}>
                   {({ copied, copy }) => (
                     <ActionIcon
-                      variant="subtle"
                       color={copied ? "green" : "gray"}
                       onClick={copy}
                       aria-label={`Copy ${alias.email}`}
@@ -486,21 +476,11 @@ export function App() {
         opened={opened && !loading}
         onClose={closeDialog}
         title={modalTitle}
-        size="md"
-        centered
         fullScreen={mobile}
         closeOnClickOutside={!busy && (!wizard || Boolean(snapshot.connection))}
         closeOnEscape={!busy && (!wizard || Boolean(snapshot.connection))}
         withCloseButton={!wizard || Boolean(snapshot.connection)}
         closeButtonProps={{ "aria-label": "Close", disabled: busy }}
-        transitionProps={{ transition: "fade", duration: 120 }}
-        overlayProps={{ backgroundOpacity: 0.35 }}
-        classNames={{
-          content: "app-modal-content",
-          body: "app-modal-body",
-          header: "app-modal-header",
-          title: "app-modal-title",
-        }}
       >
         {error && (
           <Alert color="red" mb="md" role="alert">
@@ -543,7 +523,6 @@ export function App() {
             <Stack gap="md">
               <TextInput
                 label="Label"
-                size="md"
                 placeholder="Where you’ll use it"
                 data-autofocus
                 required
@@ -554,7 +533,6 @@ export function App() {
               />
               <Textarea
                 label="Notes (optional)"
-                size="md"
                 rows={4}
                 maxLength={10_000}
                 value={newNote}
@@ -596,13 +574,7 @@ export function App() {
         ) : null}
       </Modal>
       {notice && (
-        <Notification
-          className="app-notice"
-          icon={<IconCheck size={17} />}
-          color="blue"
-          withCloseButton={false}
-          role="status"
-        >
+        <Notification icon={<IconCheck size={17} />} role="status">
           {notice}
         </Notification>
       )}

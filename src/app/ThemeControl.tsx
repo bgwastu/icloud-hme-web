@@ -20,16 +20,17 @@ export function ThemeControl() {
   });
   const selected = choices.find((choice) => choice.value === colorScheme)!;
   useEffect(() => {
+    const canvas = getComputedStyle(document.documentElement)
+      .getPropertyValue("--app-canvas")
+      .trim();
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", resolved === "dark" ? "#101419" : "#f7f8fa");
+      ?.setAttribute("content", canvas);
   }, [resolved]);
   return (
-    <Menu position="bottom-end" width={150}>
+    <Menu>
       <Menu.Target>
         <ActionIcon
-          variant="subtle"
-          color="gray"
           aria-label={`Theme: ${selected.label}`}
           title={`Theme: ${selected.label}`}
         >

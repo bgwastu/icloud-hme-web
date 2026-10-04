@@ -1,30 +1,8 @@
 :root {
-  --app-canvas: #f7f8fa;
-  --app-surface: #ffffff;
-  --app-ink: #1c2430;
-  --app-secondary: #687280;
-  --app-rule: #e5e9f0;
-  --app-controls: #e9edf3;
-  --app-hover: #fafbfe;
-  --app-focus: #1769e0;
-  --app-shadow: #1c243018;
-  color-scheme: light;
   color: var(--app-ink);
   background: var(--app-canvas);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
-}
-:root[data-mantine-color-scheme="dark"] {
-  --app-canvas: #101419;
-  --app-surface: #181e26;
-  --app-ink: #e9edf3;
-  --app-secondary: #a4afbd;
-  --app-rule: #303946;
-  --app-controls: #222b36;
-  --app-hover: #1d2530;
-  --app-focus: #87b9ff;
-  --app-shadow: #00000055;
-  color-scheme: dark;
 }
 body {
   margin: 0;
@@ -101,11 +79,6 @@ a:focus-visible {
   gap: 10px;
   min-width: 0;
 }
-.heading-title h1 {
-  font-size: 26px;
-  line-height: 1.2;
-  letter-spacing: -0.035em;
-}
 .list-heading > button {
   flex-shrink: 0;
   padding-inline: 13px;
@@ -119,17 +92,6 @@ a:focus-visible {
 .list-tools > :first-child {
   flex: 1;
   min-width: 0;
-}
-.list-tools .mantine-SegmentedControl-root {
-  align-self: flex-start;
-  background: var(--app-controls);
-}
-.list-tools .mantine-SegmentedControl-label {
-  min-height: 40px;
-  min-width: 72px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .address-list {
   border: 1px solid var(--app-rule);
@@ -198,20 +160,6 @@ a:focus-visible {
   padding: 56px 16px;
   text-align: center;
 }
-.app-modal-title {
-  font-size: 19px;
-  font-weight: 650;
-  letter-spacing: -0.025em;
-}
-.app-modal-header {
-  padding: 20px 24px 12px;
-}
-.app-modal-body {
-  padding: 8px 24px 24px;
-}
-.app-modal-content {
-  border-radius: 16px;
-}
 .address-summary {
   display: flex;
   align-items: center;
@@ -229,12 +177,6 @@ a:focus-visible {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--app-rule);
-}
-.address-toggle .mantine-Switch-body,
-.address-toggle .mantine-Switch-label {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
 }
 .modal-footer {
   padding-top: 24px;
@@ -265,16 +207,6 @@ a:focus-visible {
   align-self: flex-start;
   font-weight: 600;
 }
-.app-notice {
-  position: fixed;
-  bottom: calc(20px + env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 400;
-  min-width: 180px;
-  max-width: calc(100vw - 32px);
-  box-shadow: 0 6px 20px var(--app-shadow);
-}
 @media (hover: hover) {
   .address-row:hover {
     background: var(--app-hover);
@@ -290,15 +222,8 @@ a:focus-visible {
   .app-main {
     padding: 40px 24px;
   }
-  .heading-title h1 {
-    font-size: 30px;
-  }
   .list-tools {
     flex-direction: row;
-    align-items: center;
-  }
-  .list-tools .mantine-SegmentedControl-root {
-    align-self: stretch;
     align-items: center;
   }
   .address-row {
@@ -316,24 +241,6 @@ a:focus-visible {
   }
 }
 @media (max-width: 640px) {
-  .app-modal-content {
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    border-radius: 0;
-  }
-  .app-modal-header {
-    padding: calc(16px + env(safe-area-inset-top)) 20px 12px;
-    flex-shrink: 0;
-  }
-  .app-modal-body {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 8px 20px calc(20px + env(safe-area-inset-bottom));
-    display: flex;
-    flex-direction: column;
-  }
   .editor,
   .editor-form,
   .wizard,
@@ -348,14 +255,8 @@ a:focus-visible {
   .address-actions {
     margin-bottom: 24px;
   }
-  .app-modal-body .mantine-Input-input {
-    font-size: 16px;
-  }
 }
 @media (max-width: 360px) {
-  .heading-title h1 {
-    font-size: 23px;
-  }
   .list-heading > button {
     font-size: 13px;
     padding-inline: 10px;

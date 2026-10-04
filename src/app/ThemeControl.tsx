@@ -45,9 +45,10 @@ export function ThemeControl() {
               setColorScheme(value);
           }}
         >
-          {choices.map(({ value, label }) => (
+          {choices.map(({ value, label, Icon }) => (
             <Menu.RadioItem key={value} value={value} closeMenuOnClick>
-              {label}
+              <Icon size={17} aria-hidden="true" />
+              <span>{label}</span>
             </Menu.RadioItem>
           ))}
         </Menu.RadioGroup>

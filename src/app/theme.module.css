@@ -27,6 +27,19 @@
   line-height: 1.2;
   letter-spacing: -0.035em;
 }
+.themeChoice[aria-checked="true"] {
+  background-color: var(--mantine-primary-color-light);
+  color: var(--mantine-primary-color-light-color);
+  font-weight: 600;
+}
+.themeChoiceLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+}
+.themeChoiceIndicator {
+  display: none;
+}
 .segmentedRoot {
   align-self: flex-start;
   background: var(--app-controls);
@@ -103,5 +116,13 @@
 @media (max-width: 360px) {
   .pageTitle {
     font-size: 23px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :global(*),
+  :global(*::before),
+  :global(*::after) {
+    animation: none !important;
+    transition: none !important;
   }
 }

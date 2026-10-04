@@ -18,7 +18,7 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
+import { useMediaQuery, useReducedMotion } from "@mantine/hooks";
 import {
   IconCheck,
   IconChevronRight,
@@ -40,6 +40,9 @@ const empty: Snapshot = { aliases: [], connection: null, operations: [] };
 export function App() {
   const { search, params, navigate, close } = useAppLocation();
   const mobile = useMediaQuery("(max-width: 40em)");
+  const reducedMotion = useReducedMotion(undefined, {
+    getInitialValueInEffect: false,
+  });
   const [snapshot, setSnapshot] = useState<Snapshot>(empty);
   const current = useRef(snapshot);
   const [loading, setLoading] = useState(true),
@@ -544,7 +547,8 @@ export function App() {
               <Button
                 type="submit"
                 fullWidth
-                loading={busy}
+                loading={busy && !reducedMotion}
+                aria-busy={busy}
                 disabled={blocked || !newLabel.trim()}
               >
                 Create address

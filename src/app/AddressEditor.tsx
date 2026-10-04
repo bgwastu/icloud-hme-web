@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActionIcon,
   Alert,
-  Badge,
   Button,
   CopyButton,
   Group,
+  Loader,
   Stack,
+  Switch,
   Text,
   Textarea,
   TextInput,
@@ -53,6 +54,7 @@ export function AddressEditor({
       },
   );
   const [checking, setChecking] = useState(true);
+  const [changingActivation, setChangingActivation] = useState(false);
   const [noteReadable, setNoteReadable] = useState(false);
   const [confirm, setConfirm] = useState("");
   const deleteButton = useRef<HTMLButtonElement>(null),
@@ -171,16 +173,6 @@ export function AddressEditor({
           )}
         </CopyButton>
       </div>
-      <Badge
-        size="sm"
-        variant="light"
-        color={alias.active ? "green" : "gray"}
-        tt="none"
-        mb="lg"
-        style={{ alignSelf: "flex-start" }}
-      >
-        {alias.active ? "Active" : "Inactive"}
-      </Badge>
       {conflict && (
         <Alert color="yellow" title="Changed in iCloud" mb="lg">
           <Text size="sm">
@@ -271,25 +263,38 @@ export function AddressEditor({
           )}
         </Stack>
         <Group className="address-actions" justify="space-between">
-          <Button
-            size="sm"
-            variant="outline"
-            color="gray"
-            disabled={blocked || checking}
-            onClick={() =>
+          <Switch
+            className="address-toggle"
+            label="Receive email"
+            size="md"
+            checked={alias.active}
+            disabled={blocked || checking || changingActivation}
+            aria-busy={changingActivation}
+            thumbIcon={changingActivation ? <Loader size={12} /> : undefined}
+            onChange={(event) => {
+              const enabled = event.currentTarget.checked;
+              if (blocked || checking || changingActivation) return;
+              setChangingActivation(true);
               void run(async () => {
                 const result = await mutation(
-                  `/aliases/${encodeURIComponent(alias.id)}/${alias.active ? "deactivate" : "reactivate"}`,
+                  `/aliases/${encodeURIComponent(alias.id)}/${enabled ? "reactivate" : "deactivate"}`,
                   "POST",
                   {},
                 );
                 accept(result);
-                update(result.snapshot);
-              })
-            }
-          >
-            {alias.active ? "Deactivate" : "Reactivate"}
-          </Button>
+                const fresh = result.snapshot.aliases.find(
+                  (item) => item.id === alias.id,
+                );
+                if (fresh)
+                  setDraft((current) =>
+                    fresh.label === current.base.label &&
+                    fresh.note === current.base.note
+                      ? { ...current, base: fresh }
+                      : current,
+                  );
+              }).finally(() => setChangingActivation(false));
+            }}
+          />
           <Button
             ref={deleteButton}
             size="sm"

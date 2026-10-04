@@ -5,6 +5,7 @@ import {
   createTheme,
   Button,
   ActionIcon,
+  localStorageColorSchemeManager,
 } from "@mantine/core";
 import { App } from "./App";
 import "@mantine/core/styles.css";
@@ -14,6 +15,18 @@ const theme = createTheme({
   primaryColor: "blue",
   primaryShade: 6,
   colors: {
+    dark: [
+      "#e9edf3",
+      "#c2cbd7",
+      "#a4afbd",
+      "#8391a3",
+      "#526074",
+      "#303946",
+      "#222b36",
+      "#181e26",
+      "#101419",
+      "#0b0f14",
+    ],
     blue: [
       "#edf5ff",
       "#dceaff",
@@ -36,8 +49,15 @@ const theme = createTheme({
     ActionIcon: ActionIcon.extend({ defaultProps: { size: 44 } }),
   },
 });
+const colorSchemeManager = localStorageColorSchemeManager({
+  key: "icloud-hme-color-scheme",
+});
 createRoot(document.getElementById("root")!).render(
-  <MantineProvider theme={theme} forceColorScheme="light">
+  <MantineProvider
+    theme={theme}
+    defaultColorScheme="auto"
+    colorSchemeManager={colorSchemeManager}
+  >
     <App />
   </MantineProvider>,
 );

@@ -11,6 +11,7 @@ import {
   Textarea,
   Title,
 } from "@mantine/core";
+import { useReducedMotion } from "@mantine/hooks";
 import { IconExternalLink } from "@tabler/icons-react";
 import type { Connection, Region } from "../shared/types";
 import { api } from "./api";
@@ -30,6 +31,9 @@ export function ConnectionWizard({
   run: (task: () => Promise<void>) => Promise<void>;
   connected: () => Promise<void>;
 }) {
+  const reducedMotion = useReducedMotion(undefined, {
+    getInitialValueInEffect: false,
+  });
   const [region, setRegion] = useState<Region>(connection?.region ?? "global");
   const [cookies, setCookies] = useState("");
   const importing = step === "import";
@@ -136,7 +140,12 @@ export function ConnectionWizard({
             >
               Back
             </Button>
-            <Button type="submit" loading={busy} disabled={!cookies.trim()}>
+            <Button
+              type="submit"
+              loading={busy && !reducedMotion}
+              disabled={busy || !cookies.trim()}
+              aria-busy={busy}
+            >
               Connect iCloud
             </Button>
           </Group>

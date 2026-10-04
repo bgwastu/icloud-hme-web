@@ -189,6 +189,26 @@ test("persists light and dark choices and follows system changes in auto mode", 
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-mantine-color-scheme", "dark");
   await page.getByRole("button", { name: "Theme: Auto", exact: true }).click();
+  for (const [label, icon] of [
+    ["Light", "sun"],
+    ["Dark", "moon"],
+    ["Auto", "device-desktop"],
+  ]) {
+    const choice = page.getByRole("menuitemradio", {
+      name: label,
+      exact: true,
+    });
+    await expect(choice.locator(`svg.tabler-icon-${icon}`)).toBeVisible();
+    await expect(choice.locator("svg")).toHaveCount(1);
+    await expect(choice).toHaveAttribute(
+      "aria-checked",
+      String(label === "Auto"),
+    );
+  }
+  await page.screenshot({
+    path: `test-results/theme-menu-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
   await page.getByRole("menuitemradio", { name: "Light", exact: true }).click();
   await expect(html).toHaveAttribute("data-mantine-color-scheme", "light");
   await page.reload();
@@ -280,6 +300,15 @@ test("connects through the first-use wizard without retaining the pasted cookie"
   page,
 }) => {
   await mockApi(page, false);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/icloud/connection", async (route) => {
+    await pending;
+    await route.fallback();
+  });
   await page.goto("/");
   await expect(
     page.getByRole("dialog", { name: "Connect iCloud" }),
@@ -287,9 +316,23 @@ test("connects through the first-use wizard without retaining the pasted cookie"
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/dialog=connect.*step=import/);
   await page.getByLabel("iCloud cookies").fill("session=test-cookie");
-  await page
-    .getByRole("button", { name: "Connect iCloud", exact: true })
-    .click();
+  const connect = page.getByRole("button", {
+    name: "Connect iCloud",
+    exact: true,
+  });
+  try {
+    await connect.click();
+    await expect(connect).toBeDisabled();
+    await expect(connect).toHaveAttribute("aria-busy", "true");
+    await expect(connect).not.toHaveAttribute("data-loading");
+    await expect(connect.locator(".mantine-Loader-root")).toHaveCount(0);
+    await expect(connect.locator(".mantine-Button-label")).toHaveCSS(
+      "opacity",
+      "1",
+    );
+  } finally {
+    release();
+  }
   await expect(page.getByRole("dialog")).not.toBeVisible();
   await expect(page.getByRole("status")).toContainText("iCloud connected");
   expect(await page.content()).not.toContain("session=test-cookie");
@@ -298,6 +341,145 @@ test("connects through the first-use wizard without retaining the pasted cookie"
       JSON.stringify({ ...localStorage, ...sessionStorage }),
     ),
   ).not.toContain("test-cookie");
+});
+test("stops skeleton animation and switches pending creation to a disabled button when motion is reduced", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  let releaseLoad!: () => void, releaseCreate!: () => void;
+  const loading = new Promise<void>((resolve) => {
+    releaseLoad = resolve;
+  });
+  const creating = new Promise<void>((resolve) => {
+    releaseCreate = resolve;
+  });
+  await page.route("**/api/aliases", async (route) => {
+    await (route.request().method() === "GET" ? loading : creating);
+    await route.fallback();
+  });
+  try {
+    await page.goto("/");
+    const addresses = page.getByRole("region", {
+      name: "Addresses",
+      exact: true,
+    });
+    await expect(addresses).toHaveAttribute("aria-busy", "true");
+    const skeleton = addresses.locator(".mantine-Skeleton-root").first();
+    await expect(skeleton).toBeVisible();
+    expect(
+      await skeleton.evaluate(
+        (element) => getComputedStyle(element, "::after").animationName,
+      ),
+    ).toBe("none");
+    expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+    releaseLoad();
+    await expect(addresses).toHaveAttribute("aria-busy", "false");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.getByRole("button", { name: "New address" }).click();
+    await page
+      .getByRole("textbox", { name: "Label", exact: true })
+      .fill("Reduced motion account");
+    const create = page.getByRole("button", {
+      name: "Create address",
+      exact: true,
+    });
+    await create.click();
+    await expect(create).toBeDisabled();
+    await expect(create).toHaveAttribute("data-loading", "true");
+    await expect(create.locator(".mantine-Loader-root")).toBeVisible();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(create).toBeDisabled();
+    await expect(create).toHaveAttribute("aria-busy", "true");
+    await expect(create).not.toHaveAttribute("data-loading");
+    await expect(create.locator(".mantine-Loader-root")).toHaveCount(0);
+    await expect(create.locator(".mantine-Button-label")).toHaveCSS(
+      "opacity",
+      "1",
+    );
+    expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+    releaseCreate();
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await expect(
+      page.getByText("Reduced motion account", { exact: true }),
+    ).toBeVisible();
+    expect(mock.writes()).toBe(1);
+  } finally {
+    releaseLoad();
+    releaseCreate();
+  }
+});
+test("uses disabled controls without spinners for reduced-motion edits, delivery changes and deletion", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const releases: Record<string, () => void> = {};
+  const pending = Object.fromEntries(
+    ["PATCH", "POST", "DELETE"].map((method) => [
+      method,
+      new Promise<void>((resolve) => {
+        releases[method] = resolve;
+      }),
+    ]),
+  );
+  await page.route(/\/api\/aliases\/1(?:\/deactivate)?$/, async (route) => {
+    if (route.request().method() !== "GET")
+      await pending[route.request().method()];
+    await route.fallback();
+  });
+  try {
+    await page.goto("/?address=1");
+    const dialog = page.getByRole("dialog", { name: "Edit address" });
+    const toggle = dialog.getByRole("switch", { name: "Receive email" });
+    await expect(toggle).toBeEnabled();
+    await dialog
+      .getByLabel("Notes", { exact: true })
+      .fill("Static pending controls");
+    const save = dialog.getByRole("button", { name: "Save changes" });
+    await save.click();
+    await expect(save).toBeDisabled();
+    await expect(save).toHaveAttribute("aria-busy", "true");
+    await expect(save).not.toHaveAttribute("data-loading");
+    await expect(save.locator(".mantine-Loader-root")).toHaveCount(0);
+    await expect(save.locator(".mantine-Button-label")).toHaveCSS(
+      "opacity",
+      "1",
+    );
+    releases.PATCH();
+    await expect(save).toHaveAttribute("aria-busy", "false");
+    await expect(toggle).toBeEnabled();
+    await toggle.click();
+    await expect(toggle).toBeDisabled();
+    await expect(toggle).toHaveAttribute("aria-busy", "true");
+    await expect(dialog.locator(".mantine-Loader-root")).toHaveCount(0);
+    expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+    releases.POST();
+    await expect(toggle).not.toBeChecked();
+    await expect(toggle).toBeEnabled();
+    await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+    await page
+      .getByLabel("Type the address to confirm")
+      .fill("quiet-inbox@icloud.com");
+    const remove = page.getByRole("button", {
+      name: "Delete permanently",
+      exact: true,
+    });
+    await remove.click();
+    await expect(remove).toBeDisabled();
+    await expect(remove).toHaveAttribute("aria-busy", "true");
+    await expect(remove).not.toHaveAttribute("data-loading");
+    await expect(remove.locator(".mantine-Loader-root")).toHaveCount(0);
+    await expect(remove.locator(".mantine-Button-label")).toHaveCSS(
+      "opacity",
+      "1",
+    );
+    releases.DELETE();
+    await expect(page.getByText("Address deleted")).toBeVisible();
+    expect(mock.writes()).toBe(3);
+  } finally {
+    Object.values(releases).forEach((release) => release());
+  }
 });
 test("creates an alias and clears a note while preserving the label", async ({
   page,

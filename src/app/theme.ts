@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   Menu,
+  MenuRadioItem,
   Modal,
   NativeSelect,
   Notification,
@@ -72,6 +73,16 @@ export const theme = createTheme({
     Stepper: Stepper.extend({ defaultProps: { size: "xs" } }),
     Menu: Menu.extend({
       defaultProps: { position: "bottom-end", width: 180 },
+    }),
+    MenuRadioItem: MenuRadioItem.extend({
+      defaultProps: {
+        checkIcon: false,
+        classNames: {
+          item: classes.themeChoice,
+          itemLabel: classes.themeChoiceLabel,
+          itemIndicator: classes.themeChoiceIndicator,
+        },
+      },
     }),
     Title: Title.extend({
       classNames: (_, props) => ({

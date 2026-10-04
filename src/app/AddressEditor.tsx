@@ -12,6 +12,7 @@ import {
   Textarea,
   TextInput,
 } from "@mantine/core";
+import { useReducedMotion } from "@mantine/hooks";
 import { IconCheck, IconCopy, IconTrash } from "@tabler/icons-react";
 import type { Alias, Snapshot } from "../shared/types";
 import { api, mutation, type MutationResult } from "./api";
@@ -45,6 +46,9 @@ export function AddressEditor({
   cancelDelete: () => void;
   deleted: () => void;
 }) {
+  const reducedMotion = useReducedMotion(undefined, {
+    getInitialValueInEffect: false,
+  });
   const [draft, setDraft] = useState<AddressDraft>(
     () =>
       drafts.get(alias.id) ?? {
@@ -145,7 +149,8 @@ export function AddressEditor({
           <Button
             color="red"
             type="submit"
-            loading={busy}
+            loading={busy && !reducedMotion}
+            aria-busy={busy}
             disabled={blocked || confirm !== alias.email}
           >
             Delete permanently
@@ -264,7 +269,11 @@ export function AddressEditor({
             checked={alias.active}
             disabled={blocked || checking || changingActivation}
             aria-busy={changingActivation}
-            thumbIcon={changingActivation ? <Loader size={12} /> : undefined}
+            thumbIcon={
+              changingActivation && !reducedMotion ? (
+                <Loader size={12} />
+              ) : undefined
+            }
             onChange={(event) => {
               const enabled = event.currentTarget.checked;
               if (blocked || checking || changingActivation) return;
@@ -305,7 +314,8 @@ export function AddressEditor({
           <Button
             fullWidth
             type="submit"
-            loading={busy}
+            loading={busy && !reducedMotion}
+            aria-busy={busy}
             disabled={
               blocked || checking || !dirty || !noteReadable || conflict
             }

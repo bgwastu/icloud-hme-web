@@ -33,6 +33,7 @@ import type { Snapshot } from "../shared/types";
 import { api, ApiError, mutation, type MutationResult } from "./api";
 import { AddressEditor, type AddressDraft } from "./AddressEditor";
 import { ConnectionWizard } from "./ConnectionWizard";
+import { ThemeControl } from "./ThemeControl";
 import { locationHref, useAppLocation } from "./location";
 
 const empty: Snapshot = { aliases: [], connection: null, operations: [] };
@@ -237,34 +238,37 @@ export function App() {
             <img src="/logo.svg" width="34" height="34" alt="" />
             <span>iCloud Hide My Email</span>
           </a>
-          <Menu position="bottom-end" width={180}>
-            <Menu.Target>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label="More options"
-              >
-                <IconDots size={22} />
-              </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item
-                component="a"
-                href="/api/aliases/export"
-                download
-                leftSection={<IconDownload size={17} />}
-              >
-                Export addresses
-              </Menu.Item>
-              <Menu.Item
-                component="a"
-                href="/cdn-cgi/access/logout"
-                leftSection={<IconLogout size={17} />}
-              >
-                Logout
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+          <div className="header-actions">
+            <ThemeControl />
+            <Menu position="bottom-end" width={180}>
+              <Menu.Target>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label="More options"
+                >
+                  <IconDots size={22} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item
+                  component="a"
+                  href="/api/aliases/export"
+                  download
+                  leftSection={<IconDownload size={17} />}
+                >
+                  Export addresses
+                </Menu.Item>
+                <Menu.Item
+                  component="a"
+                  href="/cdn-cgi/access/logout"
+                  leftSection={<IconLogout size={17} />}
+                >
+                  Logout
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </div>
         </div>
       </header>
       <main className="app-main">

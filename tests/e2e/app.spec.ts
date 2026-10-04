@@ -81,6 +81,16 @@ async function mockApi(page: Page, connected = true) {
         createdAt: null,
       });
       response = { operation: { status: "succeeded" }, snapshot: data };
+    } else if (
+      method === "POST" &&
+      path.match(/\/aliases\/\d+\/(deactivate|reactivate)$/)
+    ) {
+      const alias = data.aliases.find((x) => x.id === path.split("/").at(-2))!;
+      lastPayload = body;
+      writes++;
+      alias.active = path.endsWith("/reactivate");
+      alias.version = `${alias.version}-${alias.active ? "on" : "off"}`;
+      response = { operation: { status: "succeeded" }, snapshot: data };
     } else if (path.match(/\/aliases\/\d+$/)) {
       const alias = data.aliases.find((x) => x.id === path.split("/").at(-1))!;
       if (method === "GET") response = { alias };
@@ -102,6 +112,155 @@ async function mockApi(page: Page, connected = true) {
   });
   return { data, payload: () => lastPayload, writes: () => writes };
 }
+test("switches email delivery immediately while preserving unsaved notes", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  await page.goto("/?address=1");
+  const dialog = page.getByRole("dialog", { name: "Edit address" });
+  const toggle = dialog.getByRole("switch", { name: "Receive email" });
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).toBeChecked();
+  await expect(dialog.getByText("Active", { exact: true })).not.toBeVisible();
+  await dialog.getByLabel("Notes", { exact: true }).fill("Unsaved note");
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
+  await expect(toggle).toBeEnabled();
+  expect(mock.data.aliases[0].active).toBe(false);
+  expect(mock.writes()).toBe(1);
+  await expect(dialog.getByLabel("Notes", { exact: true })).toHaveValue(
+    "Unsaved note",
+  );
+  await expect(dialog.getByText("Changed in iCloud")).not.toBeVisible();
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(toggle).toBeChecked();
+  await expect(toggle).toBeEnabled();
+  expect(mock.writes()).toBe(2);
+  const version = mock.data.aliases[0].version;
+  await dialog.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  expect(mock.payload().baseVersion).toBe(version);
+  expect(mock.payload().note).toBe("Unsaved note");
+});
+test("keeps the confirmed delivery state when a switch request fails", async ({
+  page,
+}) => {
+  const mock = await mockApi(page);
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/aliases/1/deactivate", async (route) => {
+    await pending;
+    await route.fulfill({
+      status: 502,
+      json: {
+        error: { code: "provider_error", message: "Could not update address." },
+      },
+    });
+  });
+  await page.goto("/?address=1");
+  const dialog = page.getByRole("dialog", { name: "Edit address" });
+  const toggle = dialog.getByRole("switch", { name: "Receive email" });
+  await expect(toggle).toBeEnabled();
+  await dialog.getByLabel("Notes", { exact: true }).fill("Keep this draft");
+  try {
+    await toggle.click();
+    await expect(toggle).toBeDisabled();
+    await expect(toggle).toBeChecked();
+  } finally {
+    release();
+  }
+  await expect(page.getByText("Could not update address.")).toBeVisible();
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).toBeChecked();
+  await expect(dialog.getByLabel("Notes", { exact: true })).toHaveValue(
+    "Keep this draft",
+  );
+  expect(mock.data.aliases[0].active).toBe(true);
+});
+test("persists light and dark choices and follows system changes in auto mode", async ({
+  page,
+}, testInfo) => {
+  await mockApi(page);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-mantine-color-scheme", "dark");
+  await page.getByRole("button", { name: "Theme: Auto", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "Light", exact: true }).click();
+  await expect(html).toHaveAttribute("data-mantine-color-scheme", "light");
+  await page.reload();
+  await expect(html).toHaveAttribute("data-mantine-color-scheme", "light");
+  await page.getByRole("button", { name: "Theme: Light", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "Dark", exact: true }).click();
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(html).toHaveAttribute("data-mantine-color-scheme", "dark");
+  await page.reload();
+  await expect(html).toHaveAttribute("data-mantine-color-scheme", "dark");
+  expect(
+    await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+  ).toBe("rgb(16, 20, 25)");
+  await page
+    .getByRole("link", { name: "Open Newsletter subscriptions" })
+    .click();
+  await expect(
+    page.getByRole("switch", { name: "Receive email" }),
+  ).toBeEnabled();
+  await page.screenshot({
+    path: `test-results/editor-dark-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Theme: Dark", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "Auto", exact: true }).click();
+  await expect(html).toHaveAttribute("data-mantine-color-scheme", "light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(html).toHaveAttribute("data-mantine-color-scheme", "dark");
+  await page.reload();
+  await expect(html).toHaveAttribute("data-mantine-color-scheme", "dark");
+  await expect(page.getByRole("button", { name: "Theme: Auto" })).toBeVisible();
+  await page.screenshot({
+    path: `test-results/aliases-dark-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+});
+test("applies the saved theme before the app starts under a strict script policy", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.addInitScript(() => {
+    localStorage.setItem("icloud-hme-color-scheme", "dark");
+  });
+  await page.route("**/", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      headers: {
+        ...response.headers(),
+        "content-security-policy":
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+      },
+    });
+  });
+  await page.route("**/assets/*.js", (route) => route.abort());
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mantine-color-scheme",
+    "dark",
+  );
+  expect(
+    await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+  ).toBe("rgb(16, 20, 25)");
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute(
+    "content",
+    "#101419",
+  );
+  await expect(page.getByRole("button", { name: "More options" })).toHaveCount(
+    0,
+  );
+});
 test("logs out through Access without disconnecting the Apple account", async ({
   page,
 }) => {

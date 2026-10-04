@@ -4,10 +4,27 @@
   --app-ink: #1c2430;
   --app-secondary: #687280;
   --app-rule: #e5e9f0;
+  --app-controls: #e9edf3;
+  --app-hover: #fafbfe;
+  --app-focus: #1769e0;
+  --app-shadow: #1c243018;
+  color-scheme: light;
   color: var(--app-ink);
   background: var(--app-canvas);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
+}
+:root[data-mantine-color-scheme="dark"] {
+  --app-canvas: #101419;
+  --app-surface: #181e26;
+  --app-ink: #e9edf3;
+  --app-secondary: #a4afbd;
+  --app-rule: #303946;
+  --app-controls: #222b36;
+  --app-hover: #1d2530;
+  --app-focus: #87b9ff;
+  --app-shadow: #00000055;
+  color-scheme: dark;
 }
 body {
   margin: 0;
@@ -25,7 +42,7 @@ a {
 }
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid #1769e0;
+  outline: 2px solid var(--app-focus);
   outline-offset: 3px;
 }
 .app-header {
@@ -55,6 +72,12 @@ a:focus-visible {
   letter-spacing: -0.025em;
 }
 .brand img {
+  flex-shrink: 0;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
 }
 .brand span {
@@ -99,7 +122,7 @@ a:focus-visible {
 }
 .list-tools .mantine-SegmentedControl-root {
   align-self: flex-start;
-  background: #e9edf3;
+  background: var(--app-controls);
 }
 .list-tools .mantine-SegmentedControl-label {
   min-height: 40px;
@@ -168,7 +191,7 @@ a:focus-visible {
 }
 .row-chevron {
   display: none;
-  color: #9aa4b2;
+  color: var(--app-secondary);
   flex-shrink: 0;
 }
 .empty-list {
@@ -194,6 +217,7 @@ a:focus-visible {
   align-items: center;
   gap: 8px;
   margin-right: -8px;
+  margin-bottom: 20px;
 }
 .address-email {
   flex: 1;
@@ -205,6 +229,12 @@ a:focus-visible {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--app-rule);
+}
+.address-toggle .mantine-Switch-body,
+.address-toggle .mantine-Switch-label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
 }
 .modal-footer {
   padding-top: 24px;
@@ -243,11 +273,11 @@ a:focus-visible {
   z-index: 400;
   min-width: 180px;
   max-width: calc(100vw - 32px);
-  box-shadow: 0 6px 20px #1c243018;
+  box-shadow: 0 6px 20px var(--app-shadow);
 }
 @media (hover: hover) {
   .address-row:hover {
-    background: #fafbfe;
+    background: var(--app-hover);
   }
 }
 @media (min-width: 641px) {

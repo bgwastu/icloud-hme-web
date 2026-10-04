@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title description">
+  <!-- Mail icon: Tabler Icons, Copyright (c) 2020-2026 Paweł Kuna. MIT; see tabler-icons-LICENSE.txt. -->
+  <title id="title">icloud-hme-web</title>
+  <desc id="description">The official Tabler Mail icon in white, centered on a full blue background.</desc>
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2F80F7"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#blue)"/>
+  <g transform="translate(64 64) scale(16)" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10"/>
+    <path d="M3 7l9 6l9 -6"/>
+  </g>
+</svg>

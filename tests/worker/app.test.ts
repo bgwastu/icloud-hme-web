@@ -24,6 +24,7 @@ interface AppleAlias {
   label: string;
   note?: string;
   isActive: boolean;
+  createTimestamp?: number;
 }
 let aliases: AppleAlias[],
   calls: { path: string; body: Record<string, unknown> }[];
@@ -138,6 +139,7 @@ beforeEach(async () => {
           label: body.label as string,
           note: body.note as string,
           isActive: true,
+          createTimestamp: Date.now(),
         });
         if (loseReserve)
           throw new Error("Connection lost after Apple applied the request");
@@ -162,6 +164,64 @@ afterEach(() => {
 });
 
 describe("iCloud operations with real Worker crypto and D1", () => {
+  it("sorts newest first across statuses and keeps that order after edits and creation", async () => {
+    aliases = [
+      {
+        anonymousId: "apple-older",
+        hme: "older@icloud.com",
+        label: "A older address",
+        note: "Older note",
+        isActive: true,
+        createTimestamp: Date.UTC(2024, 0, 1),
+      },
+      {
+        anonymousId: "apple-newest",
+        hme: "newest@icloud.com",
+        label: "Z newest address",
+        note: "Newer note",
+        isActive: false,
+        createTimestamp: Date.UTC(2025, 0, 1) / 1000,
+      },
+      {
+        anonymousId: "apple-unknown",
+        hme: "unknown@icloud.com",
+        label: "A unknown creation date",
+        note: "",
+        isActive: true,
+      },
+    ];
+    await connect();
+    const ordered = await snapshot();
+    expect(ordered.aliases.map((alias) => alias.email)).toEqual([
+      "newest@icloud.com",
+      "older@icloud.com",
+      "unknown@icloud.com",
+    ]);
+    const older = ordered.aliases[1];
+    expect(
+      (
+        await request(`/aliases/${older.id}`, "PATCH", {
+          operationKey: key(),
+          baseVersion: older.version,
+          label: "Recently edited",
+        })
+      ).status,
+    ).toBe(200);
+    expect((await snapshot()).aliases.map((alias) => alias.email)).toEqual(
+      ordered.aliases.map((alias) => alias.email),
+    );
+    const created = await request("/aliases", "POST", {
+      operationKey: key(),
+      label: "New address",
+      note: "",
+    });
+    expect(created.status).toBe(201);
+    expect(
+      ((await created.json()) as { snapshot: Snapshot }).snapshot.aliases[0]
+        .email,
+    ).toBe("new-random@icloud.com");
+    expect((await snapshot()).aliases[0].email).toBe("new-random@icloud.com");
+  });
   it("creates, edits Unicode notes, clears notes, toggles and permanently deletes at the provider", async () => {
     await connect();
     const operationKey = key();

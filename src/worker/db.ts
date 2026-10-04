@@ -178,7 +178,7 @@ export class Store {
         .bind(this.owner),
       this.db
         .prepare(
-          "SELECT * FROM aliases WHERE connection_id IN (SELECT id FROM connections WHERE owner_id = ?) AND deleted_at IS NULL ORDER BY active DESC, label COLLATE NOCASE, email",
+          "SELECT * FROM aliases WHERE connection_id IN (SELECT id FROM connections WHERE owner_id = ?) AND deleted_at IS NULL ORDER BY provider_created_at DESC, email COLLATE NOCASE, id",
         )
         .bind(this.owner),
       this.db

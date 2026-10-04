@@ -131,7 +131,6 @@ export function AddressEditor({
         <TextInput
           ref={confirmInput}
           label="Type the address to confirm"
-          size="md"
           value={confirm}
           autoComplete="off"
           spellCheck={false}
@@ -163,7 +162,6 @@ export function AddressEditor({
         <CopyButton value={alias.email}>
           {({ copied, copy }) => (
             <ActionIcon
-              variant="subtle"
               color={copied ? "green" : "gray"}
               onClick={copy}
               aria-label="Copy address"
@@ -237,7 +235,6 @@ export function AddressEditor({
         <Stack gap="md">
           <TextInput
             label="Label"
-            size="md"
             value={draft.label}
             maxLength={256}
             disabled={busy}
@@ -247,7 +244,6 @@ export function AddressEditor({
           />
           <Textarea
             label="Notes"
-            size="md"
             value={draft.note}
             rows={5}
             maxLength={10_000}
@@ -264,9 +260,7 @@ export function AddressEditor({
         </Stack>
         <Group className="address-actions" justify="space-between">
           <Switch
-            className="address-toggle"
             label="Receive email"
-            size="md"
             checked={alias.active}
             disabled={blocked || checking || changingActivation}
             aria-busy={changingActivation}

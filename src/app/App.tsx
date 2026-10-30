@@ -547,7 +547,7 @@ export function App() {
                 if (created) {
                   setNotice("Address created");
                   copyAddress(created.email);
-                  navigate({ dialog: null, address: created.id });
+                  navigate({ dialog: null, address: created.id }, true);
                 } else {
                   setNotice("Address created");
                   close();

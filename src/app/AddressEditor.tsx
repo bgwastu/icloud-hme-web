@@ -13,6 +13,7 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useReducedMotion } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import { IconCheck, IconCopy, IconTrash } from "@tabler/icons-react";
 import type { Alias, Snapshot } from "../shared/types";
 import { api, mutation, type MutationResult } from "./api";
@@ -168,7 +169,23 @@ export function AddressEditor({
           {({ copied, copy }) => (
             <ActionIcon
               color={copied ? "green" : "gray"}
-              onClick={copy}
+              onClick={() => {
+                copy();
+                void navigator.clipboard.writeText(alias.email).then(
+                  () =>
+                    notifications.show({
+                      message: `Copied ${alias.email}`,
+                      color: "green",
+                      autoClose: 2500,
+                    }),
+                  () =>
+                    notifications.show({
+                      message: "Couldn't copy automatically — select the address to copy it.",
+                      color: "red",
+                      autoClose: 4000,
+                    }),
+                );
+              }}
               aria-label="Copy address"
             >
               {copied ? <IconCheck size={19} /> : <IconCopy size={19} />}

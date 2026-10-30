@@ -545,6 +545,7 @@ export function App() {
                   (alias) => !known.has(alias.id),
                 );
                 if (created) {
+                  setNotice("Address created");
                   copyAddress(created.email);
                   navigate({ dialog: null, address: created.id });
                 } else {

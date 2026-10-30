@@ -19,6 +19,7 @@ import {
   Title,
 } from "@mantine/core";
 import { useMediaQuery, useReducedMotion } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import {
   IconCheck,
   IconChevronRight,
@@ -76,6 +77,22 @@ export function App() {
   const update = useCallback((data: Snapshot) => {
     current.current = data;
     setSnapshot(data);
+  }, []);
+  const copyAddress = useCallback((email: string) => {
+    void navigator.clipboard.writeText(email).then(
+      () =>
+        notifications.show({
+          message: `Copied ${email}`,
+          color: "green",
+          autoClose: 2500,
+        }),
+      () =>
+        notifications.show({
+          message: "Couldn't copy automatically — select the address to copy it.",
+          color: "red",
+          autoClose: 4000,
+        }),
+    );
   }, []);
   const load = useCallback(async () => {
     const data = await api<Snapshot>("/aliases");
@@ -422,7 +439,10 @@ export function App() {
                   {({ copied, copy }) => (
                     <ActionIcon
                       color={copied ? "green" : "gray"}
-                      onClick={copy}
+                      onClick={() => {
+                        copy();
+                        copyAddress(alias.email);
+                      }}
                       aria-label={`Copy ${alias.email}`}
                     >
                       {copied ? (
@@ -513,13 +533,25 @@ export function App() {
             onSubmit={(event) => {
               event.preventDefault();
               void run(async () => {
+                const known = new Set(
+                  snapshot.aliases.map((alias) => alias.id),
+                );
                 const result = await mutation("/aliases", "POST", {
                   label: newLabel,
                   note: newNote,
                 });
                 accept(result);
-                setNotice("Address created");
-                close();
+                const created = result.snapshot.aliases.find(
+                  (alias) => !known.has(alias.id),
+                );
+                if (created) {
+                  setNotice("Address created");
+                  copyAddress(created.email);
+                  navigate({ dialog: null, address: created.id }, true);
+                } else {
+                  setNotice("Address created");
+                  close();
+                }
               });
             }}
           >

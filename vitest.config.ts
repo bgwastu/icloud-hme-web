@@ -12,8 +12,9 @@ export default defineConfig({
         bindings: {
           APP_ENV: "local",
           LOCAL_AUTH: "true",
+          // Deterministic 32-byte test-only key. Not a secret; never used outside tests.
           SESSION_ENCRYPTION_KEY:
-            "GG_REDACTED_SESSION_KEY",
+            "Z2l0Z3VhcmRpYW4tdGVzdC1maXh0dXJlLWtleS0wMDE=",
           TEST_MIGRATIONS: await readD1Migrations("./migrations"),
         },
       },

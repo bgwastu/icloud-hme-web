@@ -399,10 +399,11 @@ test("stops skeleton animation and switches pending creation to a disabled butto
     );
     expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
     releaseCreate();
-    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await expect(page.getByText("Address created", { exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeVisible();
     await expect(
-      page.getByText("Reduced motion account", { exact: true }),
-    ).toBeVisible();
+      page.getByRole("textbox", { name: "Label", exact: true }),
+    ).toHaveValue("Reduced motion account");
     expect(mock.writes()).toBe(1);
   } finally {
     releaseLoad();
@@ -494,8 +495,13 @@ test("creates an alias and clears a note while preserving the label", async ({
   await page
     .getByRole("button", { name: "Create address", exact: true })
     .click();
-  await expect(page.getByText("New account", { exact: true })).toBeVisible();
+  await expect(page.getByText("Address created", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Label", exact: true }),
+  ).toHaveValue("New account");
   expect(mock.payload().operationKey).toMatch(/^[a-f\d-]{36}$/);
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
   await page
     .getByRole("link", { name: "Open Newsletter subscriptions" })
     .click();
